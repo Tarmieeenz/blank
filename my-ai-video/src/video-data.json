@@ -1,4 +1,3 @@
-
 {
   "brand": "AI MOTION STUDIO",
   "background": "#111111",
@@ -6,16 +5,16 @@
   "accentColor": "#FF814A",
   "scenes": [
     {
-      "title": "STOP SCROLLING.",
-      "subtitle": "Ada sesuatu yang perlu kamu dengar."
+      "title": "Psikologi kamu itu unik",
+      "subtitle": "Ternyata otak kita punya kebiasaan yang jarang kamu sadari lho."
     },
     {
-      "title": "KAMU BOLEH CAPEK.",
-      "subtitle": "Gak semua hari harus produktif."
+      "title": "Fakta psikologi yang relevan",
+      "subtitle": "Otak kita cenderung ingat kejadian negatif lebih detail daripada hal positif."
     },
     {
-      "title": "TAKE YOUR TIME.",
-      "subtitle": "Progress gak harus selalu cepat."
+      "title": "Follow untuk fakta lainnya",
+      "subtitle": "Menarik kan? Cek profil untuk konten psikologi seru lainnya!"
     }
   ]
 }
