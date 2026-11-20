@@ -2,64 +2,201 @@
 import express from "express";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { mkdir, stat } from "node:fs/promises";
+import { mkdir, readFile, writeFile, stat, readdir } from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const app = express();
 const PORT = 3001;
 
-// Batasi ukuran request
-app.use(express.json({ limit: "10kb" }));
-app.use(express.static("dashboard"));
-app.use("/videos", express.static("out"));
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-// Hanya izinkan satu pekerjaan sekaligus
+const DASHBOARD_DIR = path.join(__dirname, "dashboard");
+const OUTPUT_DIR = path.join(__dirname, "out");
+const HISTORY_FILE = path.join(__dirname, "video-history.json");
+
+app.use(express.json({ limit: "10kb" }));
+app.use(express.static(DASHBOARD_DIR));
+app.use("/videos", express.static(OUTPUT_DIR));
+
 let currentJob = null;
 let lastResult = null;
 
+let history = [];
 
-app.get("/api/latest-video", async (req, res) => {
+async function saveHistory() {
+  await writeFile(
+    HISTORY_FILE,
+    JSON.stringify(history, null, 2),
+    "utf8"
+  );
+}
+
+async function loadHistory() {
   try {
-    const file = await stat("out/ai-video.mp4");
-
-    if (!file.isFile()) {
-      return res.json({ available: false });
-    }
-
-    res.json({
-      available: true,
-      videoUrl: "/videos/ai-video.mp4",
-      updatedAt: file.mtime.toISOString(),
-      size: file.size,
-    });
+    const data = await readFile(HISTORY_FILE, "utf8");
+    const parsed = JSON.parse(data);
+    history = Array.isArray(parsed) ? parsed : [];
   } catch (error) {
-    if (error.code === "ENOENT") {
-      return res.json({ available: false });
+    if (error.code !== "ENOENT") {
+      console.error("Gagal membaca history:", error.message);
     }
-
-    console.error("Gagal mengecek video:", error);
-    res.status(500).json({
-      error: "Gagal membaca file video.",
-    });
+    history = [];
   }
-});
+}
 
+function publicJob(job) {
+  return {
+    id: job.id,
+    topic: job.topic,
+    status: job.status,
+    createdAt: job.createdAt,
+    completedAt: job.completedAt ?? null,
+    videoUrl: job.videoUrl ?? null,
+    error: job.error ?? null,
+  };
+}
+
+function runVideo(topic, jobId) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(
+      process.execPath,
+      ["auto-video.mjs", topic],
+      {
+        cwd: __dirname,
+        env: process.env,
+        shell: false,
+        stdio: ["ignore", "pipe", "pipe"],
+      }
+    );
+
+    let output = "";
+    let errorOutput = "";
+
+    child.stdout.on("data", (chunk) => {
+      const text = chunk.toString();
+      output += text;
+      console.log(text);
+    });
+
+    child.stderr.on("data", (chunk) => {
+      const text = chunk.toString();
+      errorOutput += text;
+      console.error(text);
+    });
+
+    child.on("error", reject);
+
+    child.on("close", async (code) => {
+      if (code !== 0) {
+        return reject(
+          new Error(
+            `Generate gagal (exit ${code}). ` +
+            errorOutput.slice(-500)
+          )
+        );
+      }
+
+      // Ambil lokasi MP4 unik dari auto-video.mjs
+      const match = output.match(
+        /VIDEO_OUTPUT:(out\/ai-video-[a-f0-9-]+\.mp4)/
+      );
+
+      if (!match) {
+        return reject(
+          new Error("Nama file video tidak ditemukan.")
+        );
+      }
+
+      const filename = path.basename(match[1]);
+      const filePath = path.join(OUTPUT_DIR, filename);
+
+      try {
+        const info = await stat(filePath);
+
+        if (!info.isFile() || info.size === 0) {
+          throw new Error("File MP4 tidak valid.");
+        }
+
+        resolve({
+          videoUrl: `/videos/${filename}`,
+          filename,
+          size: info.size,
+        });
+      } catch (error) {
+        reject(error);
+      }
+    });
+  });
+}
+
+// STATUS
 app.get("/api/status", (req, res) => {
   res.json({
     running: currentJob !== null,
-    job: currentJob,
-    lastResult: lastResult,
+    job: currentJob ? publicJob(currentJob) : null,
+    lastResult,
   });
 });
 
-app.post("/api/generate", (req, res) => {
+// VIDEO HISTORY
+app.get("/api/history", (req, res) => {
+  res.json({
+    videos: history
+      .filter((job) => job.status === "success")
+      .map(publicJob)
+      .reverse(),
+  });
+});
+
+// LATEST VIDEO
+app.get("/api/latest-video", async (req, res) => {
+  const latest = [...history]
+    .reverse()
+    .find((job) => job.status === "success");
+
+  if (latest?.videoUrl) {
+    return res.json({
+      available: true,
+      videoUrl: latest.videoUrl,
+      jobId: latest.id,
+      updatedAt: latest.completedAt,
+    });
+  }
+
+  // Kompatibilitas dengan video lama
+  try {
+    const file = await stat(
+      path.join(OUTPUT_DIR, "ai-video.mp4")
+    );
+
+    if (file.isFile()) {
+      return res.json({
+        available: true,
+        videoUrl: "/videos/ai-video.mp4",
+        updatedAt: file.mtime.toISOString(),
+        size: file.size,
+      });
+    }
+  } catch {
+    // Tidak ada video lama
+  }
+
+  res.json({ available: false });
+});
+
+// GENERATE VIDEO
+app.post("/api/generate", async (req, res) => {
   const topic = req.body?.topic;
 
-  if (typeof topic !== "string" ||
-      topic.trim().length < 3 ||
-      topic.length > 500) {
+  if (
+    typeof topic !== "string" ||
+    topic.trim().length < 3 ||
+    topic.length > 500
+  ) {
     return res.status(400).json({
-      error: "Topik harus berisi 3–500 karakter.",
+      error: "Topik harus 3–500 karakter.",
     });
   }
 
@@ -69,71 +206,78 @@ app.post("/api/generate", (req, res) => {
     });
   }
 
-  const jobId = randomUUID();
-  const outputName = `${jobId}.mp4`;
-
-  currentJob = {
-    id: jobId,
-    status: "processing",
+  const job = {
+    id: randomUUID(),
     topic: topic.trim(),
+    status: "processing",
+    createdAt: new Date().toISOString(),
   };
 
-  const child = spawn(
-    process.execPath,
-    ["auto-video.mjs", topic.trim()],
-    {
-      cwd: process.cwd(),
-      env: process.env,
-      shell: false,
-      stdio: "pipe",
-    }
-  );
+  currentJob = job;
+  lastResult = null;
 
-  child.stdout.on("data", (data) => {
-    console.log(data.toString());
-  });
-
-  child.stderr.on("data", (data) => {
-    console.error(data.toString());
-  });
-
-  child.on("error", (error) => {
-    console.error("Gagal menjalankan AI:", error.message);
-    currentJob = null;
-  });
-
-  
-child.on("close", (code) => {
-  console.log("Video process exit code:", code);
-
-  if (code === 0) {
-    lastResult = {
-      status: "success",
-      jobId,
-      videoUrl: "/videos/ai-video.mp4",
-    };
-
-    console.log("✅ Video berhasil dibuat!");
-  } else {
-    lastResult = {
-      status: "failed",
-      jobId,
-      error: "Proses AI atau rendering gagal.",
-    };
-
-    console.log("❌ Video gagal dibuat.");
-  }
-
-  currentJob = null;
-});
-
+  history.push(job);
 
   res.status(202).json({
     message: "Video sedang diproses.",
-    jobId,
+    jobId: job.id,
   });
+
+  // Jalankan workflow di belakang request HTTP
+  (async () => {
+    try {
+      await saveHistory();
+
+      const result = await runVideo(job.topic, job.id);
+
+      job.status = "success";
+      job.videoUrl = result.videoUrl;
+      job.filename = result.filename;
+      job.size = result.size;
+      job.completedAt = new Date().toISOString();
+
+      lastResult = {
+        status: "success",
+        jobId: job.id,
+        videoUrl: job.videoUrl,
+      };
+
+      console.log("✅ Video berhasil:", result.filename);
+
+    } catch (error) {
+      job.status = "failed";
+      job.error = error.message;
+      job.completedAt = new Date().toISOString();
+
+      lastResult = {
+        status: "failed",
+        jobId: job.id,
+        error: error.message,
+      };
+
+      console.error("❌ Video gagal:", error.message);
+
+    } finally {
+      try {
+        await saveHistory();
+      } catch (error) {
+        console.error(
+          "Gagal menyimpan history:",
+          error.message
+        );
+      }
+
+      currentJob = null;
+    }
+  })();
 });
 
+// START SERVER
+await mkdir(OUTPUT_DIR, { recursive: true });
+await loadHistory();
+
 app.listen(PORT, "127.0.0.1", () => {
-  console.log(`AI Video Server aktif di port ${PORT}`);
+  console.log(
+    `✅ AI Video Factory aktif di port ${PORT}`
+  );
 });

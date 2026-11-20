@@ -3,60 +3,49 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport"
-    content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>AI Video Factory</title>
   <style>
     * { box-sizing: border-box; }
-
     body {
       margin: 0;
       background: #0c0d12;
       color: #f5f5f7;
       font-family: Arial, sans-serif;
     }
-
     .container {
-      max-width: 850px;
-      margin: 70px auto;
+      max-width: 1000px;
+      margin: 60px auto;
       padding: 24px;
     }
-
     .eyebrow {
       color: #a78bfa;
       letter-spacing: 3px;
       font-size: 12px;
       font-weight: bold;
     }
-
     h1 {
-      font-size: clamp(36px, 6vw, 62px);
+      font-size: clamp(36px, 6vw, 60px);
       letter-spacing: -2px;
       margin: 14px 0;
     }
-
-    .subtitle {
-      color: #9898a8;
-      line-height: 1.7;
-    }
-
+    h2 { margin: 0 0 20px; font-size: 23px; }
+    .subtitle { color: #9898a8; line-height: 1.7; }
     .card {
       background: #171820;
       border: 1px solid #30313c;
       border-radius: 20px;
       padding: 28px;
-      margin-top: 36px;
+      margin-top: 28px;
     }
-
     label {
       display: block;
       font-weight: bold;
       margin-bottom: 14px;
     }
-
     textarea {
       width: 100%;
-      min-height: 150px;
+      min-height: 140px;
       background: #0f1016;
       color: white;
       padding: 18px;
@@ -65,38 +54,55 @@
       font: inherit;
       resize: vertical;
     }
-
-    textarea:focus {
-      outline: 2px solid #8b5cf6;
-    }
-
-    button {
-      margin-top: 18px;
+    textarea:focus { outline: 2px solid #8b5cf6; }
+    button, .download {
+      display: inline-block;
       background: #8b5cf6;
       border: 0;
       border-radius: 12px;
-      padding: 16px 25px;
+      padding: 14px 22px;
       color: white;
-      font-size: 16px;
+      font-size: 14px;
       font-weight: bold;
       cursor: pointer;
+      text-decoration: none;
     }
-
-    button:hover { background: #7c3aed; }
-
-    button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
+    button:hover, .download:hover { background: #7c3aed; }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    #generate { margin-top: 16px; }
+    #status { margin-top: 22px; color: #b7b7c8; line-height: 1.7; }
+    .video-box { display: none; margin-top: 24px; }
+    video {
+      display: block;
+      width: 100%;
+      max-width: 340px;
+      max-height: 500px;
+      background: #000;
+      border-radius: 14px;
+      margin: 14px 0;
     }
-
-    #status {
-      margin-top: 24px;
-      color: #b7b7c8;
-      line-height: 1.7;
+    .history-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 18px;
     }
-
+    .history-item {
+      background: #101118;
+      border: 1px solid #30313c;
+      border-radius: 14px;
+      padding: 16px;
+    }
+    .history-item video { max-height: 290px; }
+    .history-item h3 {
+      font-size: 14px;
+      line-height: 1.5;
+      margin: 10px 0;
+      overflow-wrap: anywhere;
+    }
+    .history-item p { color: #9898a8; font-size: 12px; }
+    .empty { color: #9898a8; font-size: 14px; }
     .footer {
-      margin-top: 50px;
+      margin-top: 48px;
       color: #666879;
       font-size: 12px;
     }
@@ -112,50 +118,29 @@
     </p>
 
     <section class="card">
+      <h2>Create Video</h2>
       <label for="topic">What should we create today?</label>
-
       <textarea id="topic"
-        placeholder="Contoh: 3 fakta psikologi tentang overthinking"></textarea>
-
-      <button id="generate" type="button">
-        ✨ Generate Video
-      </button>
-
+        placeholder="Contoh: 3 fakta psikologi tentang overthinking"
+        maxlength="500"></textarea>
+      <button id="generate" type="button">✨ Generate Video</button>
       <div id="status" role="status" aria-live="polite">
         Ready to create your next video.
       </div>
 
-<div id="video-result" style="display:none; margin-top:24px;">
-  <h3>🎬 Your Video Is Ready!</h3>
+      <div id="video-result" class="video-box">
+        <h2>🎬 Latest Video</h2>
+        <video id="video-preview" controls playsinline preload="metadata"></video>
+        <a id="download-video" class="download"
+           href="#" download>⬇ Download MP4</a>
+      </div>
+    </section>
 
-  <video
-    id="video-preview"
-    controls
-    playsinline
-    style="width:100%; max-width:340px; border-radius:12px;"
-  ></video>
-
-  <div>
-    <a
-      id="download-video"
-      href="#"
-      download="ai-video.mp4"
-      style="
-        display:inline-block;
-        margin-top:16px;
-        padding:14px 22px;
-        background:#8b5cf6;
-        color:white;
-        text-decoration:none;
-        border-radius:10px;
-        font-weight:bold;
-      "
-    >
-      ⬇ Download MP4
-    </a>
-  </div>
-</div>
-
+    <section class="card">
+      <h2>Video History</h2>
+      <div id="history" class="history-grid">
+        <p class="empty">Loading video history...</p>
+      </div>
     </section>
 
     <p class="footer">
@@ -165,129 +150,178 @@
 
   <script>
     const button = document.getElementById("generate");
-    const status = document.getElementById("status");
+    const statusText = document.getElementById("status");
     const topicInput = document.getElementById("topic");
-
-    let timer = null;
-
-    
-async function checkStatus() {
-  try {
-    const response = await fetch("/api/status");
-
-    if (!response.ok) {
-      throw new Error("Gagal membaca status server");
-    }
-
-    const data = await response.json();
-
-    if (data.running) {
-      status.textContent = "🎬 AI sedang membuat video...";
-      return;
-    }
-
-    clearInterval(timer);
-    timer = null;
-    button.disabled = false;
-
-    const result = data.lastResult;
-    console.log("STATUS VIDEO:", data);
     const videoResult = document.getElementById("video-result");
     const videoPreview = document.getElementById("video-preview");
     const downloadLink = document.getElementById("download-video");
+    const historyContainer = document.getElementById("history");
 
-    if (result?.status === "success") {
-      status.textContent = "✅ Video berhasil dibuat!";
+    let activeJobId = null;
+    let lastShownUrl = null;
+    let pollTimer = null;
 
-      const videoUrl = result.videoUrl + "?t=" + Date.now();
+    async function getJson(url, options = {}) {
+      const response = await fetch(url, {
+        cache: "no-store",
+        ...options,
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Server error");
+      }
+      return data;
+    }
 
-      videoPreview.src = videoUrl;
-      downloadLink.href = videoUrl;
+    function displayVideo(url) {
+      if (!url) return;
+
+      // Cegah reload player berulang kali
+      if (lastShownUrl !== url) {
+        const cacheBuster = (url.includes("?") ? "&" : "?") +
+          "t=" + Date.now();
+        videoPreview.src = url + cacheBuster;
+        downloadLink.href = url + cacheBuster;
+        lastShownUrl = url;
+      }
+
       videoResult.style.display = "block";
-
-    } else if (result?.status === "failed") {
-      status.textContent =
-        "❌ Video gagal: " + (result.error || "Unknown error");
-
-      videoResult.style.display = "none";
-
-    } else {
-      status.textContent = "Belum ada hasil video.";
-      videoResult.style.display = "none";
     }
 
-  } catch (error) {
-    clearInterval(timer);
-    timer = null;
-    button.disabled = false;
-    status.textContent = "❌ " + error.message;
-  }
-}
-
-
-async function loadLatestVideo() {
-  try {
-    const response = await fetch("/api/latest-video");
-
-    if (!response.ok) {
-      throw new Error("Gagal mengambil video terakhir");
+    async function loadLatestVideo() {
+      try {
+        const data = await getJson("/api/latest-video");
+        if (data.available && data.videoUrl) {
+          displayVideo(data.videoUrl);
+        }
+      } catch (error) {
+        console.error("Latest video:", error);
+      }
     }
 
-    const data = await response.json();
+    async function loadHistory() {
+      try {
+        const data = await getJson("/api/history");
+        historyContainer.replaceChildren();
 
-    if (!data.available) return;
+        if (!Array.isArray(data.videos) || data.videos.length === 0) {
+          const empty = document.createElement("p");
+          empty.className = "empty";
+          empty.textContent =
+            "Belum ada video di history. Video baru akan muncul di sini.";
+          historyContainer.appendChild(empty);
+          return;
+        }
 
-    const videoResult = document.getElementById("video-result");
-    const videoPreview = document.getElementById("video-preview");
-    const downloadLink = document.getElementById("download-video");
+        for (const item of data.videos) {
+          if (!item.videoUrl) continue;
 
-    const url = data.videoUrl + "?t=" +
-      new Date(data.updatedAt).getTime();
+          const card = document.createElement("article");
+          card.className = "history-item";
 
-    videoPreview.src = url;
-    downloadLink.href = url;
-    videoResult.style.display = "block";
+          const video = document.createElement("video");
+          video.controls = true;
+          video.playsInline = true;
+          video.preload = "none";
+          video.src = item.videoUrl;
 
-    status.textContent = "✅ Video terakhir siap ditonton!";
-  } catch (error) {
-    console.error("Gagal memuat video:", error);
-  }
-}
+          const title = document.createElement("h3");
+          title.textContent = item.topic || "Untitled Video";
 
-loadLatestVideo();
+          const date = document.createElement("p");
+          const timestamp = item.completedAt || item.createdAt;
+          date.textContent = timestamp
+            ? new Date(timestamp).toLocaleString("id-ID")
+            : "";
+
+          const link = document.createElement("a");
+          link.className = "download";
+          link.href = item.videoUrl;
+          link.download = "";
+          link.textContent = "⬇ Download";
+
+          card.append(video, title, date, link);
+          historyContainer.appendChild(card);
+        }
+      } catch (error) {
+        historyContainer.textContent =
+          "Gagal memuat history: " + error.message;
+      }
+    }
+
+    async function checkStatus() {
+      try {
+        const data = await getJson("/api/status");
+
+        if (data.running) {
+          button.disabled = true;
+          statusText.textContent = "🎬 AI sedang membuat video...";
+          return;
+        }
+
+        button.disabled = false;
+
+        if (activeJobId) {
+          const result = data.lastResult;
+
+          if (result && result.jobId === activeJobId) {
+            if (result.status === "success" && result.videoUrl) {
+              statusText.textContent = "✅ Video berhasil dibuat!";
+              displayVideo(result.videoUrl);
+              await loadHistory();
+            } else if (result.status === "failed") {
+              statusText.textContent =
+                "❌ Video gagal: " + (result.error || "Unknown error");
+            }
+            activeJobId = null;
+          } else {
+            statusText.textContent =
+              "Status pekerjaan belum tersedia. Cek backend.";
+            activeJobId = null;
+          }
+        }
+      } catch (error) {
+        statusText.textContent =
+          "❌ Gagal membaca status: " + error.message;
+      }
+    }
 
     button.addEventListener("click", async () => {
       const topic = topicInput.value.trim();
 
       if (topic.length < 3 || topic.length > 500) {
-        status.textContent =
-          "⚠️ Masukkan topik sepanjang 3–500 karakter.";
+        statusText.textContent =
+          "⚠️ Topik harus sepanjang 3–500 karakter.";
         return;
       }
 
       button.disabled = true;
-      status.textContent = "🤖 Mengirim perintah ke AI...";
+      statusText.textContent = "🤖 Mengirim prompt ke Gemini...";
 
       try {
-        const response = await fetch("/api/generate", {
+        const data = await getJson("/api/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ topic }),
         });
 
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.error || "Gagal memulai proses");
-        }
-
-        status.textContent = "🎬 Video mulai diproses...";
-        timer = setInterval(checkStatus, 3000);
+        activeJobId = data.jobId;
+        statusText.textContent = "🎬 Video sedang diproses...";
       } catch (error) {
         button.disabled = false;
-        status.textContent = "❌ " + error.message;
+        statusText.textContent = "❌ " + error.message;
       }
     });
+
+    async function initialize() {
+      await Promise.all([loadLatestVideo(), loadHistory()]);
+      await checkStatus();
+
+      // Mulai pemantauan status
+      pollTimer = setInterval(checkStatus, 3000);
+    }
+
+    initialize();
   </script>
 </body>
 </html>
