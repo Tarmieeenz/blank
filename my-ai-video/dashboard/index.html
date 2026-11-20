@@ -1,0 +1,293 @@
+
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0" />
+  <title>AI Video Factory</title>
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: #0c0d12;
+      color: #f5f5f7;
+      font-family: Arial, sans-serif;
+    }
+
+    .container {
+      max-width: 850px;
+      margin: 70px auto;
+      padding: 24px;
+    }
+
+    .eyebrow {
+      color: #a78bfa;
+      letter-spacing: 3px;
+      font-size: 12px;
+      font-weight: bold;
+    }
+
+    h1 {
+      font-size: clamp(36px, 6vw, 62px);
+      letter-spacing: -2px;
+      margin: 14px 0;
+    }
+
+    .subtitle {
+      color: #9898a8;
+      line-height: 1.7;
+    }
+
+    .card {
+      background: #171820;
+      border: 1px solid #30313c;
+      border-radius: 20px;
+      padding: 28px;
+      margin-top: 36px;
+    }
+
+    label {
+      display: block;
+      font-weight: bold;
+      margin-bottom: 14px;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 150px;
+      background: #0f1016;
+      color: white;
+      padding: 18px;
+      border: 1px solid #414252;
+      border-radius: 12px;
+      font: inherit;
+      resize: vertical;
+    }
+
+    textarea:focus {
+      outline: 2px solid #8b5cf6;
+    }
+
+    button {
+      margin-top: 18px;
+      background: #8b5cf6;
+      border: 0;
+      border-radius: 12px;
+      padding: 16px 25px;
+      color: white;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:hover { background: #7c3aed; }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    #status {
+      margin-top: 24px;
+      color: #b7b7c8;
+      line-height: 1.7;
+    }
+
+    .footer {
+      margin-top: 50px;
+      color: #666879;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <div class="eyebrow">YOUR PERSONAL AI STUDIO</div>
+    <h1>AI Video Factory<span style="color:#a78bfa">.</span></h1>
+    <p class="subtitle">
+      Turn your ideas into short-form videos with Gemini AI
+      and Remotion. One prompt. One workflow.
+    </p>
+
+    <section class="card">
+      <label for="topic">What should we create today?</label>
+
+      <textarea id="topic"
+        placeholder="Contoh: 3 fakta psikologi tentang overthinking"></textarea>
+
+      <button id="generate" type="button">
+        ✨ Generate Video
+      </button>
+
+      <div id="status" role="status" aria-live="polite">
+        Ready to create your next video.
+      </div>
+
+<div id="video-result" style="display:none; margin-top:24px;">
+  <h3>🎬 Your Video Is Ready!</h3>
+
+  <video
+    id="video-preview"
+    controls
+    playsinline
+    style="width:100%; max-width:340px; border-radius:12px;"
+  ></video>
+
+  <div>
+    <a
+      id="download-video"
+      href="#"
+      download="ai-video.mp4"
+      style="
+        display:inline-block;
+        margin-top:16px;
+        padding:14px 22px;
+        background:#8b5cf6;
+        color:white;
+        text-decoration:none;
+        border-radius:10px;
+        font-weight:bold;
+      "
+    >
+      ⬇ Download MP4
+    </a>
+  </div>
+</div>
+
+    </section>
+
+    <p class="footer">
+      AI VIDEO FACTORY — Powered by Gemini + Remotion
+    </p>
+  </main>
+
+  <script>
+    const button = document.getElementById("generate");
+    const status = document.getElementById("status");
+    const topicInput = document.getElementById("topic");
+
+    let timer = null;
+
+    
+async function checkStatus() {
+  try {
+    const response = await fetch("/api/status");
+
+    if (!response.ok) {
+      throw new Error("Gagal membaca status server");
+    }
+
+    const data = await response.json();
+
+    if (data.running) {
+      status.textContent = "🎬 AI sedang membuat video...";
+      return;
+    }
+
+    clearInterval(timer);
+    timer = null;
+    button.disabled = false;
+
+    const result = data.lastResult;
+    console.log("STATUS VIDEO:", data);
+    const videoResult = document.getElementById("video-result");
+    const videoPreview = document.getElementById("video-preview");
+    const downloadLink = document.getElementById("download-video");
+
+    if (result?.status === "success") {
+      status.textContent = "✅ Video berhasil dibuat!";
+
+      const videoUrl = result.videoUrl + "?t=" + Date.now();
+
+      videoPreview.src = videoUrl;
+      downloadLink.href = videoUrl;
+      videoResult.style.display = "block";
+
+    } else if (result?.status === "failed") {
+      status.textContent =
+        "❌ Video gagal: " + (result.error || "Unknown error");
+
+      videoResult.style.display = "none";
+
+    } else {
+      status.textContent = "Belum ada hasil video.";
+      videoResult.style.display = "none";
+    }
+
+  } catch (error) {
+    clearInterval(timer);
+    timer = null;
+    button.disabled = false;
+    status.textContent = "❌ " + error.message;
+  }
+}
+
+
+async function loadLatestVideo() {
+  try {
+    const response = await fetch("/api/latest-video");
+
+    if (!response.ok) {
+      throw new Error("Gagal mengambil video terakhir");
+    }
+
+    const data = await response.json();
+
+    if (!data.available) return;
+
+    const videoResult = document.getElementById("video-result");
+    const videoPreview = document.getElementById("video-preview");
+    const downloadLink = document.getElementById("download-video");
+
+    const url = data.videoUrl + "?t=" +
+      new Date(data.updatedAt).getTime();
+
+    videoPreview.src = url;
+    downloadLink.href = url;
+    videoResult.style.display = "block";
+
+    status.textContent = "✅ Video terakhir siap ditonton!";
+  } catch (error) {
+    console.error("Gagal memuat video:", error);
+  }
+}
+
+loadLatestVideo();
+
+    button.addEventListener("click", async () => {
+      const topic = topicInput.value.trim();
+
+      if (topic.length < 3 || topic.length > 500) {
+        status.textContent =
+          "⚠️ Masukkan topik sepanjang 3–500 karakter.";
+        return;
+      }
+
+      button.disabled = true;
+      status.textContent = "🤖 Mengirim perintah ke AI...";
+
+      try {
+        const response = await fetch("/api/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ topic }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Gagal memulai proses");
+        }
+
+        status.textContent = "🎬 Video mulai diproses...";
+        timer = setInterval(checkStatus, 3000);
+      } catch (error) {
+        button.disabled = false;
+        status.textContent = "❌ " + error.message;
+      }
+    });
+  </script>
+</body>
+</html>
