@@ -1,0 +1,21 @@
+
+{
+  "brand": "AI MOTION STUDIO",
+  "background": "#111111",
+  "textColor": "#F5F2EA",
+  "accentColor": "#FF814A",
+  "scenes": [
+    {
+      "title": "STOP SCROLLING.",
+      "subtitle": "Ada sesuatu yang perlu kamu dengar."
+    },
+    {
+      "title": "KAMU BOLEH CAPEK.",
+      "subtitle": "Gak semua hari harus produktif."
+    },
+    {
+      "title": "TAKE YOUR TIME.",
+      "subtitle": "Progress gak harus selalu cepat."
+    }
+  ]
+}
