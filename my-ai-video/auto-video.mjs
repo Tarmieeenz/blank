@@ -1,8 +1,24 @@
 
 import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { mkdir } from "node:fs/promises";
 
-const topic = process.argv.slice(2).join(" ").trim();
+const args = process.argv.slice(2);
+const jobIdFlag = args.lastIndexOf("--job-id");
+const jobId = jobIdFlag === -1 ? randomUUID() : args[jobIdFlag + 1];
+
+if (jobIdFlag !== -1) {
+  args.splice(jobIdFlag, 2);
+}
+
+const topic = args.join(" ").trim();
+
+if (!/^[a-f0-9-]{36}$/.test(jobId)) {
+  console.error("❌ Job ID video tidak valid!");
+  process.exit(1);
+}
+
+const outputPath = `out/ai-video-${jobId}.mp4`;
 
 if (!topic) {
   console.error("❌ Masukkan topik video!");
@@ -38,7 +54,7 @@ async function main() {
     "remotion",
     "render",
     "MyComp",
-    "out/ai-video.mp4",
+    outputPath,
     "--codec",
     "h264",
     "--concurrency",
@@ -46,7 +62,8 @@ async function main() {
   ]);
 
   console.log("✅ VIDEO SELESAI!");
-  console.log("📁 Lokasi: out/ai-video.mp4");
+  console.log(`📁 Lokasi: ${outputPath}`);
+  console.log(`VIDEO_OUTPUT:${outputPath}`);
 }
 
 main().catch((error) => {

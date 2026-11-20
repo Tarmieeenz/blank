@@ -173,7 +173,12 @@
       return data;
     }
 
-    function displayVideo(url) {
+    function filenameFromUrl(url) {
+      const pathname = new URL(url, window.location.href).pathname;
+      return pathname.split("/").pop() || "video.mp4";
+    }
+
+    function displayVideo(url, filename = filenameFromUrl(url)) {
       if (!url) return;
 
       // Cegah reload player berulang kali
@@ -181,7 +186,8 @@
         const cacheBuster = (url.includes("?") ? "&" : "?") +
           "t=" + Date.now();
         videoPreview.src = url + cacheBuster;
-        downloadLink.href = url + cacheBuster;
+        downloadLink.href = url;
+        downloadLink.download = filename;
         lastShownUrl = url;
       }
 
@@ -192,7 +198,7 @@
       try {
         const data = await getJson("/api/latest-video");
         if (data.available && data.videoUrl) {
-          displayVideo(data.videoUrl);
+          displayVideo(data.videoUrl, data.filename);
         }
       } catch (error) {
         console.error("Latest video:", error);
@@ -237,7 +243,7 @@
           const link = document.createElement("a");
           link.className = "download";
           link.href = item.videoUrl;
-          link.download = "";
+          link.download = item.filename || filenameFromUrl(item.videoUrl);
           link.textContent = "⬇ Download";
 
           card.append(video, title, date, link);
@@ -267,7 +273,7 @@
           if (result && result.jobId === activeJobId) {
             if (result.status === "success" && result.videoUrl) {
               statusText.textContent = "✅ Video berhasil dibuat!";
-              displayVideo(result.videoUrl);
+              displayVideo(result.videoUrl, result.filename);
               await loadHistory();
             } else if (result.status === "failed") {
               statusText.textContent =

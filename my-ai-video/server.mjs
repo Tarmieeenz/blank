@@ -7,7 +7,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const app = express();
-const PORT = 3001;
+const PORT = Number.parseInt(process.env.PORT ?? "3001", 10);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -54,6 +54,8 @@ function publicJob(job) {
     createdAt: job.createdAt,
     completedAt: job.completedAt ?? null,
     videoUrl: job.videoUrl ?? null,
+    filename: job.filename ?? null,
+    size: job.size ?? null,
     error: job.error ?? null,
   };
 }
@@ -62,7 +64,7 @@ function runVideo(topic, jobId) {
   return new Promise((resolve, reject) => {
     const child = spawn(
       process.execPath,
-      ["auto-video.mjs", topic],
+      ["auto-video.mjs", topic, "--job-id", jobId],
       {
         cwd: __dirname,
         env: process.env,
@@ -160,6 +162,7 @@ app.get("/api/latest-video", async (req, res) => {
     return res.json({
       available: true,
       videoUrl: latest.videoUrl,
+      filename: latest.filename ?? path.basename(latest.videoUrl),
       jobId: latest.id,
       updatedAt: latest.completedAt,
     });
@@ -175,6 +178,7 @@ app.get("/api/latest-video", async (req, res) => {
       return res.json({
         available: true,
         videoUrl: "/videos/ai-video.mp4",
+        filename: "ai-video.mp4",
         updatedAt: file.mtime.toISOString(),
         size: file.size,
       });
@@ -240,6 +244,7 @@ app.post("/api/generate", async (req, res) => {
         status: "success",
         jobId: job.id,
         videoUrl: job.videoUrl,
+        filename: job.filename,
       };
 
       console.log("✅ Video berhasil:", result.filename);
