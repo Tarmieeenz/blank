@@ -122,7 +122,7 @@ test("tracks a unique video through status, history, preview, and download", asy
   const response = await fetch(`${baseUrl}/api/generate`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ topic: "safe test topic" }),
+    body: JSON.stringify({ topic: "safe test topic", duration: 30, aspectRatio: "square", style: "kinetic" }),
   });
   assert.equal(response.status, 202);
 
@@ -156,6 +156,15 @@ test("tracks a unique video through status, history, preview, and download", asy
   assert.ok((await videoResponse.arrayBuffer()).byteLength > 0);
 
   completedJob = { filename, videoUrl };
+});
+
+test("rejects unsupported render options before starting a job", async () => {
+  const response = await fetch(`${baseUrl}/api/generate`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ topic: "safe test topic", duration: 999 }),
+  });
+  assert.equal(response.status, 400);
 });
 
 test("reloads persisted history after a server restart", async () => {

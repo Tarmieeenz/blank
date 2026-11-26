@@ -2,7 +2,7 @@
 import express from "express";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, writeFile, stat, readdir } from "node:fs/promises";
+import { mkdir, readFile, rename, writeFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -26,18 +26,18 @@ let lastResult = null;
 let history = [];
 
 async function saveHistory() {
-  await writeFile(
-    HISTORY_FILE,
-    JSON.stringify(history, null, 2),
-    "utf8"
-  );
+  const temporary = `${HISTORY_FILE}.${process.pid}.tmp`;
+  await writeFile(temporary, JSON.stringify(history, null, 2), "utf8");
+  await rename(temporary, HISTORY_FILE);
 }
 
 async function loadHistory() {
   try {
     const data = await readFile(HISTORY_FILE, "utf8");
     const parsed = JSON.parse(data);
-    history = Array.isArray(parsed) ? parsed : [];
+    history = Array.isArray(parsed) ? parsed.map((job) => job.status === "processing" ? {
+      ...job, status: "failed", error: "Server restarted before this job finished.", completedAt: new Date().toISOString(),
+    } : job) : [];
   } catch (error) {
     if (error.code !== "ENOENT") {
       console.error("Gagal membaca history:", error.message);
@@ -56,18 +56,20 @@ function publicJob(job) {
     videoUrl: job.videoUrl ?? null,
     filename: job.filename ?? null,
     size: job.size ?? null,
+    progress: job.progress ?? null,
+    stage: job.stage ?? null,
     error: job.error ?? null,
   };
 }
 
-function runVideo(topic, jobId) {
+function runVideo(topic, jobId, options, onStage) {
   return new Promise((resolve, reject) => {
     const child = spawn(
       process.execPath,
       ["auto-video.mjs", topic, "--job-id", jobId],
       {
         cwd: __dirname,
-        env: process.env,
+        env: { ...process.env, VIDEO_OPTIONS: JSON.stringify(options) },
         shell: false,
         stdio: ["ignore", "pipe", "pipe"],
       }
@@ -79,6 +81,7 @@ function runVideo(topic, jobId) {
     child.stdout.on("data", (chunk) => {
       const text = chunk.toString();
       output += text;
+      if (output.includes("STEP 2:")) onStage("rendering", 60);
       console.log(text);
     });
 
@@ -101,9 +104,7 @@ function runVideo(topic, jobId) {
       }
 
       // Ambil lokasi MP4 unik dari auto-video.mjs
-      const match = output.match(
-        /VIDEO_OUTPUT:(out\/ai-video-[a-f0-9-]+\.mp4)/
-      );
+      const match = output.match(new RegExp(`VIDEO_OUTPUT:(out/ai-video-${jobId}\\.mp4)`));
 
       if (!match) {
         return reject(
@@ -193,15 +194,25 @@ app.get("/api/latest-video", async (req, res) => {
 // GENERATE VIDEO
 app.post("/api/generate", async (req, res) => {
   const topic = req.body?.topic;
+  const duration = Number(req.body?.duration ?? 15);
+  const aspectRatio = req.body?.aspectRatio ?? "portrait";
+  const style = req.body?.style ?? "editorial";
+  const voice = req.body?.voice === true;
 
   if (
     typeof topic !== "string" ||
     topic.trim().length < 3 ||
     topic.length > 500
   ) {
-    return res.status(400).json({
-      error: "Topik harus 3–500 karakter.",
-    });
+    return res.status(400).json({ error: "Topik harus 3–500 karakter." });
+  }
+
+  if (
+    ![15, 30, 45, 60].includes(duration) ||
+    !["portrait", "landscape", "square"].includes(aspectRatio) ||
+    !["editorial", "kinetic", "minimal"].includes(style)
+  ) {
+    return res.status(400).json({ error: "Pilihan durasi, format, atau gaya tidak valid." });
   }
 
   if (currentJob) {
@@ -214,6 +225,8 @@ app.post("/api/generate", async (req, res) => {
     id: randomUUID(),
     topic: topic.trim(),
     status: "processing",
+    progress: 10,
+    stage: "writing",
     createdAt: new Date().toISOString(),
   };
 
@@ -232,13 +245,18 @@ app.post("/api/generate", async (req, res) => {
     try {
       await saveHistory();
 
-      const result = await runVideo(job.topic, job.id);
+      const result = await runVideo(job.topic, job.id, { duration, aspectRatio, style, voice }, (stage, progress) => {
+        job.stage = stage;
+        job.progress = progress;
+      });
 
       job.status = "success";
       job.videoUrl = result.videoUrl;
       job.filename = result.filename;
       job.size = result.size;
       job.completedAt = new Date().toISOString();
+      job.progress = 100;
+      job.stage = "complete";
 
       lastResult = {
         status: "success",
@@ -253,6 +271,7 @@ app.post("/api/generate", async (req, res) => {
       job.status = "failed";
       job.error = error.message;
       job.completedAt = new Date().toISOString();
+      job.stage = "failed";
 
       lastResult = {
         status: "failed",
