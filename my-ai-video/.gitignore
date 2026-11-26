@@ -7,3 +7,4 @@ dist
 out
 
 video-history.json
+public/generated/
