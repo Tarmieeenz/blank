@@ -263,3 +263,19 @@ test("renders preview and download links in the dashboard", async () => {
     await new Promise((resolve) => browser.once("exit", resolve));
   }
 });
+
+test("refuses to start with corrupt history and preserves the file", async () => {
+  await stopServer();
+  const historyPath = path.join(sandboxDir, "video-history.json");
+  const invalidHistory = "{invalid history";
+  await writeFile(historyPath, invalidHistory, "utf8");
+
+  const processWithCorruptHistory = spawn(process.execPath, ["server.mjs"], {
+    cwd: sandboxDir,
+    env: { ...process.env, PORT: String(port) },
+    stdio: "ignore",
+  });
+  const exitCode = await new Promise((resolve) => processWithCorruptHistory.once("exit", resolve));
+  assert.notEqual(exitCode, 0);
+  assert.equal(await readFile(historyPath, "utf8"), invalidHistory);
+});

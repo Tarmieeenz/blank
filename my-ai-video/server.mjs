@@ -35,13 +35,12 @@ async function loadHistory() {
   try {
     const data = await readFile(HISTORY_FILE, "utf8");
     const parsed = JSON.parse(data);
-    history = Array.isArray(parsed) ? parsed.map((job) => job.status === "processing" ? {
+    if (!Array.isArray(parsed)) throw new Error("Video history must be an array.");
+    history = parsed.map((job) => job.status === "processing" ? {
       ...job, status: "failed", error: "Server restarted before this job finished.", completedAt: new Date().toISOString(),
-    } : job) : [];
+    } : job);
   } catch (error) {
-    if (error.code !== "ENOENT") {
-      console.error("Gagal membaca history:", error.message);
-    }
+    if (error.code !== "ENOENT") throw error;
     history = [];
   }
 }
