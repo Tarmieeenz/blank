@@ -57,7 +57,7 @@ async function generateWithRetry(request) {
 async function generateVideo() {
   console.log("🤖 Gemini sedang menulis konten...");
   const assetNames = await readdir(new URL("./public/assets/", import.meta.url)).catch(() => []);
-  const approvedImages = assetNames.filter((name) => /\.(jpg|jpeg|png|webp)$/i.test(name));
+  const approvedImages = assetNames.filter((name) => /\.(jpg|jpeg|png|webp|mp4|webm)$/i.test(name));
 
   const response = await generateWithRetry({
     model: "gemini-3.1-flash-lite",
