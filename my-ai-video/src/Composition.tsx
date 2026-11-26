@@ -1,5 +1,5 @@
 import React from "react";
-import { AbsoluteFill, Audio, Img, OffthreadVideo, interpolate, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
+import { AbsoluteFill, Audio, Img, OffthreadVideo, Sequence, interpolate, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import sample from "./video-data.json";
 
 export type VideoData = {
@@ -33,7 +33,7 @@ export const MyComposition: React.FC<{ data?: VideoData }> = ({ data = sample as
   return (
     <AbsoluteFill style={{ background: data.background, color: data.textColor, fontFamily: "Arial, sans-serif", overflow: "hidden" }}>
       {scene.image && (/\.(mp4|webm)$/i.test(scene.image)
-        ? <OffthreadVideo src={staticFile(scene.image)} muted startFrom={0} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.5 }} />
+        ? <Sequence from={Math.floor(sceneIndex * sceneDuration)} durationInFrames={Math.ceil(sceneDuration)}><OffthreadVideo src={staticFile(scene.image)} muted style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.5 }} /></Sequence>
         : <Img src={staticFile(scene.image)} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: style === "minimal" ? 0.25 : 0.45, transform: `scale(${1 + progress * 0.08})` }} />)}
       <AbsoluteFill style={{ background: style === "kinetic" ? `linear-gradient(145deg, ${data.background}dd, transparent 65%, ${accent}55)` : `linear-gradient(180deg, ${data.background}88, ${data.background}dd)` }} />
       {style !== "minimal" && <div style={{ position: "absolute", width: width * 0.75, height: width * 0.75, borderRadius: "50%", border: `2px solid ${accent}55`, right: -width * 0.32, top: height * 0.2, transform: `scale(${1 + progress * 0.2}) rotate(${progress * 40}deg)` }} />}
