@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { cp, mkdir, readFile, symlink, writeFile } from "node:fs/promises";
+import { access, cp, mkdir, readFile, symlink, writeFile } from "node:fs/promises";
+import { constants } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { after, before, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { mkdtemp } from "node:fs/promises";
+import { ensureBrowser } from "@remotion/renderer";
 
 const projectDir = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const sandboxDir = await mkdtemp(path.join(tmpdir(), "ai-video-factory-test-"));
@@ -22,6 +24,31 @@ async function getAvailablePort() {
   const address = server.address();
   await new Promise((resolve) => server.close(resolve));
   return address.port;
+}
+
+async function getBrowserExecutable() {
+  const candidates = [
+    process.env.CHROME_BIN,
+    process.env.CHROMIUM_PATH,
+    ...["chromium", "chromium-browser", "google-chrome", "google-chrome-stable"]
+      .flatMap((name) => (process.env.PATH ?? "").split(path.delimiter).map((directory) => path.join(directory, name))),
+  ];
+
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    try {
+      await access(candidate, constants.X_OK);
+      return candidate;
+    } catch {
+      // Try another installed browser.
+    }
+  }
+
+  const browser = await ensureBrowser();
+  if (browser.type === "no-browser" || browser.type === "version-mismatch") {
+    throw new Error("Remotion could not install a browser for the dashboard test.");
+  }
+  return browser.path;
 }
 
 async function startServer() {
@@ -185,7 +212,7 @@ test("reloads persisted history after a server restart", async () => {
 });
 
 test("renders preview and download links in the dashboard", async () => {
-  const chromium = "/usr/bin/chromium";
+  const chromium = await getBrowserExecutable();
   const browser = spawn(
     chromium,
     [
@@ -215,6 +242,10 @@ test("renders preview and download links in the dashboard", async () => {
         clearTimeout(timeout);
         resolve(match[1]);
       }
+    });
+    browser.once("error", (error) => {
+      clearTimeout(timeout);
+      reject(error);
     });
   });
 
